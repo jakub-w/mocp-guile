@@ -7,11 +7,11 @@
 extern "C" {
 #endif
 
-void guile_init(const char* init_file);
-void guile_cleanup();
+void guile_init (const char* init_file);
+void guile_cleanup ();
 
 // Returns a string that must be free()'d.
-void* guile_get_lyrics(void* filename);
+void* guile_get_lyrics (void* filename);
 
 #ifdef __cplusplus
 }
