@@ -24,6 +24,10 @@
 #include "lists.h"
 #include "lyrics.h"
 
+#ifdef HAVE_GUILE
+#include "guile.h"
+#endif
+
 static lists_t_strs *raw_lyrics = NULL;
 static const char *lyrics_message = NULL;
 
@@ -97,6 +101,16 @@ void lyrics_autoload (const char *filename)
 		lyrics_message = "[Lyrics not autoloaded!]";
 		return;
 	}
+
+#ifdef HAVE_GUILE
+        lyrics_filename = scm_with_guile(&guile_get_lyrics, (void*)filename);
+
+        if (lyrics_filename != NULL) {
+          raw_lyrics = lyrics_load_file (lyrics_filename);
+          free (lyrics_filename);
+          return;
+        }
+#endif
 
 	if (is_url (filename)) {
 		lyrics_message = "[Lyrics from URL is not supported!]";

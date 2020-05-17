@@ -43,6 +43,10 @@
 #include "files.h"
 #include "rcc.h"
 
+#ifdef HAVE_GUILE
+#include "guile.h"
+#endif
+
 static int mocp_argc;
 static const char **mocp_argv;
 static int popt_next_val = 1;
@@ -61,6 +65,8 @@ struct parameters
 {
 	char *config_file;
 	int no_config_file;
+	char *guile_config_file;
+	int no_guile_config_file;
 	int debug;
 	int only_server;
 	int foreground;
@@ -348,6 +354,9 @@ static void show_version ()
 #ifdef HAVE_JACK
 	printf (" JACK");
 #endif
+#ifdef HAVE_GUILE
+        printf (" GUILE");
+#endif
 #ifndef NDEBUG
 	printf (" DEBUG");
 #endif
@@ -486,6 +495,13 @@ static struct poptOption general_opts[] = {
 	{"no-config", 0, POPT_ARG_NONE, &params.no_config_file, CL_HANDLED,
 			"Use program defaults rather than any config file"
 			" (conflicts with '--config')", NULL},
+	{"guile-config", 0, POPT_ARG_STRING, &params.guile_config_file,
+	 		CL_HANDLED, "Use the specified config file for guile "
+	 		"instead of the default (conflicts with "
+	 		"'--no-guile-config')", "FILE"},
+	{"no-guile-config", 0, POPT_ARG_NONE, &params.no_guile_config_file,
+	 		CL_HANDLED, "Don't load user's guile config file "
+	 		"(conflicts with '--guile-config')", NULL},
 	{"set-option", 'O', POPT_ARG_STRING, NULL, CL_SETOPTION,
 			"Override the configuration option NAME with VALUE", "'NAME=VALUE'"},
 	{"foreground", 'F', POPT_ARG_NONE, &params.foreground, CL_HANDLED,
@@ -1061,6 +1077,9 @@ static void process_options (poptContext ctx, lists_t_strs *deferred)
 
 	if (params.config_file && params.no_config_file)
 		fatal ("Conflicting --config and --no-config options given!");
+	if (params.guile_config_file && params.no_guile_config_file)
+		fatal ("Conflicting --guile-config and --no-guile-config"
+		       " options given!");
 }
 
 /* Process the command line options and arguments. */
@@ -1238,6 +1257,23 @@ int main (int argc, const char *argv[])
 			params.config_file = create_file_name ("config");
 		options_parse (params.config_file);
 	}
+	if (!params.no_guile_config_file) {
+		if (params.guile_config_file) {
+			if (!can_read_file(params.guile_config_file)) {
+				fatal("Guile configuration file is not "
+				      "readable: %s", params.guile_config_file);
+
+			}
+		}
+		else {
+			params.guile_config_file =
+				create_file_name ("config.scm");
+		}
+		guile_init(params.guile_config_file);
+	}
+	else {
+		guile_init(NULL);
+	}
 
 	process_deferred_overrides (deferred_overrides);
 	lists_strs_free (deferred_overrides);
@@ -1257,6 +1293,7 @@ int main (int argc, const char *argv[])
 
 	lists_strs_free (args);
 	options_free ();
+        guile_cleanup ();
 	decoder_cleanup ();
 	io_cleanup ();
 	rcc_cleanup ();
