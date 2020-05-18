@@ -10,8 +10,7 @@ extern "C" {
 void guile_init (const char* init_file);
 void guile_cleanup ();
 
-// Returns a string that must be free()'d.
-void* guile_get_lyrics (void* filename);
+SCM guile_run_hook_until_success (SCM hook, SCM args);
 
 #ifdef __cplusplus
 }

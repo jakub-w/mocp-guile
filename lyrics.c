@@ -25,8 +25,40 @@
 #include "lyrics.h"
 
 #ifdef HAVE_GUILE
-#include "guile.h"
+# include "guile.h"
 #endif
+
+
+#ifdef HAVE_GUILE
+SCM guile_get_lyrics_functions;
+SCM_SNARF_INIT(
+	guile_get_lyrics_functions = scm_make_hook (SCM_INUM1);
+	scm_c_define ("get-lyrics-functions", guile_get_lyrics_functions);
+	);
+
+// Return a lyrics filename.
+// Returns a string that must be free()'d or NULL if lyrics file wasn't found.
+void* guile_get_lyrics (void* filename) {
+	if (filename == NULL) return NULL;
+
+	SCM lyrics_filename = guile_run_hook_until_success (
+		guile_get_lyrics_functions,
+		scm_list_1 (scm_from_locale_string ((const char*)filename)));
+
+	if (scm_is_string (lyrics_filename)) {
+		char* lyrics_filename_c = scm_to_utf8_string (lyrics_filename);
+
+		if (can_read_file (lyrics_filename_c)) {
+			return lyrics_filename_c;
+		} else {
+			free (lyrics_filename_c);
+		}
+	}
+
+	return NULL;
+}
+#endif
+
 
 static lists_t_strs *raw_lyrics = NULL;
 static const char *lyrics_message = NULL;

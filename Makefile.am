@@ -80,7 +80,9 @@ EXTRA_mocp_SOURCES = \
 		     jack.c \
 		     jack.h \
 		     guile.c \
-		     guile.h
+		     guile.h \
+		     guile.x \
+		     lyrics.x
 man_MANS = mocp.1
 mocp_LDADD = @EXTRA_OBJS@ -lltdl -lm
 mocp_DEPENDENCIES = @EXTRA_OBJS@
@@ -94,3 +96,18 @@ noinst_DATA = tools/README
 noinst_SCRIPTS = tools/md5check.sh tools/maketests.sh
 
 doc_DATA = config.example THANKS README README_equalizer keymap.example
+
+
+# TODO: Move this stuff to guile dir?
+GENERATED_BINDINGS = guile.x lyrics.x
+BUILT_SOURCES = $(GENERATED_BINDINGS)
+CLEANFILES = $(GENERATED_BINDINGS)
+
+guile_snarf = guile-snarf
+snarfcppopts = $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(CFLAGS) -I..
+
+%.x: %.c
+	$(AM_V_GEN)$(guile_snarf) -o $@ $< $(snarfcppopts)
+
+.PHONY: built-sources
+built-sources: $(BUILT_SOURCES)

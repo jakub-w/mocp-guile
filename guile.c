@@ -1,12 +1,47 @@
 #include "guile.h"
 
 #include <libguile.h>
+#include <libguile/hooks.h>
 
 #include "common.h"
 #include "files.h"
 #include "log.h"
+#include "lyrics.h"
+
+SCM_DEFINE (guile_run_hook_until_success, "run-hook-until-success", 1, 0, 1,
+	    (SCM hook, SCM args),
+	    "Apply all procedures from the hook @var{hook} to the arguments\n"
+	    "@var{args} one after another until one of them doesn't return\n"
+	    "#f.  The order of the procedure application is first to last.\n"
+	    "The return value is the return value of the procedure that\n"
+	    "succeeded or #f if none of them did.")
+#define FUNC_NAME s_guile_run_hook_until_success
+{
+	SCM_VALIDATE_HOOK(SCM_ARG1, hook);
+	if (scm_ilength (args) != SCM_HOOK_ARITY (hook)) {
+		SCM_MISC_ERROR (
+			"Hook ~S requires ~A arguments",
+			scm_list_2 (hook,
+				    scm_from_int (SCM_HOOK_ARITY (hook))));
+	}
+
+	SCM procs = SCM_HOOK_PROCEDURES (hook);
+	SCM result;
+	while (scm_is_pair (procs)) {
+		result = scm_apply_0 (SCM_CAR (procs), args);
+		if (scm_is_true (result))
+			return result;
+		procs = SCM_CDR (procs);
+	}
+
+	return SCM_BOOL_F;
+}
+#undef FUNC_NAME
 
 void* guile_init_internal (void* init_file) {
+#include "guile.x"
+#include "lyrics.x"
+
 	if (NULL == init_file || !can_read_file(init_file)) {
 		return NULL;
 	}
@@ -23,30 +58,4 @@ void guile_init (const char* init_file) {
 }
 
 void guile_cleanup () {
-}
-
-// Returns a string that must be free()'d or NULL if lyrics file wasn't found.
-void* guile_get_lyrics (void* filename) {
-	if (scm_to_bool (
-		    scm_not (scm_defined_p (
-				     scm_from_utf8_symbol ("get-lyrics-file"),
-				     scm_current_module ())))) {
-		return NULL;
-	}
-
-	SCM lyrics_filename =
-		scm_call_1 (scm_variable_ref (scm_c_lookup ("get-lyrics-file")),
-                            scm_from_utf8_string ((const char*)filename));
-
-	if (scm_is_string (lyrics_filename)) {
-		char* lyrics_filename_c = scm_to_utf8_string (lyrics_filename);
-
-		if (can_read_file (lyrics_filename_c)) {
-			return lyrics_filename_c;
-		} else {
-			free (lyrics_filename_c);
-		}
-	}
-
-	return NULL;
 }
