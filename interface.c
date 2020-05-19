@@ -2906,41 +2906,6 @@ static struct file_tags *get_tags (const char *file)
 	return tags_new ();
 }
 
-#ifdef HAVE_GUILE
-SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
-	    (SCM filename),
-	    "Retrieve tags stored in media file @var{filename}")
-#define FUNC_NAME s_guile_get_file_tags
-{
-	if (is_server ()) {
-		// TODO: Probably throw an error saying its unimplemented for
-		//       the server.
-		return SCM_UNSPECIFIED;
-	}
-
-	struct plist *plist;
-	int item_num;
-
-	char* filename_c = scm_to_locale_string (filename);
-	make_sure_tags_exist (filename_c);
-
-	if ((item_num = plist_find_fname (dir_plist, filename_c)) != -1)
-		plist = dir_plist;
-	else if ((item_num = plist_find_fname (playlist, filename_c)) != -1)
-		plist = playlist;
-	else
-		return guile_c_make_file_tags (NULL);
-
-	if (file_type (filename_c) == F_SOUND)
-		return guile_c_make_file_tags (plist->items[item_num].tags);
-
-	free (filename_c);
-
-	return SCM_UNSPECIFIED;
-}
-#undef FUNC_NAME
-#endif
-
 /* Get the title of a file (malloc()ed) that is present in a menu. */
 static char *get_title (const char *file)
 {
@@ -4417,6 +4382,87 @@ void interface_cmdline_formatted_info (const int server_sock,
 }
 
 #ifdef HAVE_GUILE
+void * guile_make_sure_tags_exits_internal (void* filename) {
+	make_sure_tags_exist ((const char *) filename);
+	return NULL;
+}
+
+// Return new malloc()'ed file_tags. Don't add them to the playlist or
+// anything. Just retrieve it without interrupting other events.
+// Blocks until it receives the tags.
+struct file_tags * guile_get_tags_from_srv (const char* file) {
+	int got_it = 0;
+	struct file_tags *result = NULL;
+
+	send_tags_request (file, TAGS_TIME | TAGS_COMMENTS);
+
+	while (!got_it) {
+		int type = get_int_from_srv ();
+		void *data = get_event_data (type);
+
+		if (EV_FILE_TAGS != type) {
+			server_event (type, data);
+		}
+		else {
+			struct tag_ev_response *ev =
+				(struct tag_ev_response *) data;
+
+			if (!strcmp (ev->file, file)) {
+				got_it = 1;
+
+				result = ev->tags;
+				free(ev->file);
+				free(ev);
+			}
+			else
+				server_event (type, data);
+		}
+	}
+	return result;
+}
+
+// TODO: Test if it works when the requested file isn't on the playlist.
+//       It will ask the server to send them but I don't know if it will
+//       really work.
+SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
+	    (SCM filename),
+	    "Retrieve tags stored in media file @var{filename}")
+#define FUNC_NAME s_guile_get_file_tags
+{
+	if (is_server ()) {
+		// TODO: Probably throw an error saying its unimplemented for
+		//       the server.
+		return SCM_BOOL_F;
+	}
+
+	scm_dynwind_begin (0);
+
+	char* filename_c = scm_to_locale_string (filename);
+	scm_dynwind_free (filename_c);
+
+	struct plist *plist = NULL;
+	int item_num = -1;
+	SCM result = SCM_BOOL_F;
+
+	if ((item_num = plist_find_fname (dir_plist, filename_c)) != -1)
+		plist = dir_plist;
+	else if ((item_num = plist_find_fname (playlist, filename_c)) != -1)
+		plist = playlist;
+	else {		    /* If there are no tags in the playlist */
+		result = guile_take_file_tags (
+			guile_get_tags_from_srv (filename_c));
+	}
+
+	if (plist && (file_type (filename_c) == F_SOUND)) {
+		result = guile_c_make_file_tags (plist->items[item_num].tags);
+	}
+
+	scm_dynwind_end();
+
+	return result;
+}
+#undef FUNC_NAME
+
 
 void guile_init_interface () {
 #include "interface.x"

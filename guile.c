@@ -43,8 +43,10 @@ SCM_DEFINE (guile_run_hook_until_success, "run-hook-until-success", 1, 0, 1,
 #undef FUNC_NAME
 
 void* guile_init_internal (void* init_file) {
+#ifndef SCM_MAGIC_SNARFER
 #include "guile.x"
 #include "lyrics.x"
+#endif
 
 	guile_init_interface ();
 	guile_init_playlist ();

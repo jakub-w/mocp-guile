@@ -121,9 +121,10 @@ int plist_get_position (const struct plist *plist, int num);
 
 SCM guile_make_file_tags (SCM title, SCM artist, SCM album,
 			  SCM track, SCM time);
-
 // Create a new copy of tags.
 SCM guile_c_make_file_tags (const struct file_tags* tags);
+// Create SCM representation taking ownership of tags
+SCM guile_take_file_tags (struct file_tags* tags);
 SCM guile_file_tags_p (SCM obj);
 SCM guile_file_tags_set_artist_x (SCM tags, SCM artist);
 SCM guile_file_tags_set_title_x (SCM tags, SCM title);

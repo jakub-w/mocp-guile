@@ -1039,13 +1039,17 @@ SCM guile_c_make_file_tags (const struct file_tags* tags) {
 					  tags_dup(tags));
 }
 
+SCM guile_take_file_tags (struct file_tags* tags) {
+	return scm_make_foreign_object_1 (guile_file_tags_t, tags);
+}
+
 SCM_DEFINE (guile_file_tags_p, "file-tags?", 1, 0, 0,
 	    (SCM obj),
 	    "Return @code{#t} if @var{obj} is file-tags, otherwise return\n"
 	    "@code{#f}.")
 #define FUNC_NAME s_guile_file_tags_p
 {
-	return SCM_IS_A_P (obj, guile_file_tags_t);
+	return scm_from_bool (SCM_IS_A_P (obj, guile_file_tags_t));
 }
 #undef FUNC_NAME
 
