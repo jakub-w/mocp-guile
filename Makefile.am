@@ -80,9 +80,7 @@ EXTRA_mocp_SOURCES = \
 		     jack.c \
 		     jack.h \
 		     guile.c \
-		     guile.h \
-		     guile.x \
-		     lyrics.x
+		     guile.h
 man_MANS = mocp.1
 mocp_LDADD = @EXTRA_OBJS@ -lltdl -lm
 mocp_DEPENDENCIES = @EXTRA_OBJS@
@@ -99,7 +97,8 @@ doc_DATA = config.example THANKS README README_equalizer keymap.example
 
 
 # TODO: Move this stuff to guile dir?
-GENERATED_BINDINGS = guile.x lyrics.x
+GENERATED_BINDINGS = guile.x interface.x lyrics.x playlist.x
+EXTRA_mocp_SOURCES += $(GENERATED_BINDINGS)
 BUILT_SOURCES = $(GENERATED_BINDINGS)
 CLEANFILES = $(GENERATED_BINDINGS)
 

@@ -48,6 +48,10 @@
 #include "softmixer.h"
 #include "utf8.h"
 
+#ifdef HAVE_GUILE
+# include "guile.h"
+#endif
+
 #define INTERFACE_LOG	"mocp_client_log"
 #define PLAYLIST_FILE	"playlist.m3u"
 
@@ -2902,6 +2906,41 @@ static struct file_tags *get_tags (const char *file)
 	return tags_new ();
 }
 
+#ifdef HAVE_GUILE
+SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
+	    (SCM filename),
+	    "Retrieve tags stored in media file @var{filename}")
+#define FUNC_NAME s_guile_get_file_tags
+{
+	if (is_server ()) {
+		// TODO: Probably throw an error saying its unimplemented for
+		//       the server.
+		return SCM_UNSPECIFIED;
+	}
+
+	struct plist *plist;
+	int item_num;
+
+	char* filename_c = scm_to_locale_string (filename);
+	make_sure_tags_exist (filename_c);
+
+	if ((item_num = plist_find_fname (dir_plist, filename_c)) != -1)
+		plist = dir_plist;
+	else if ((item_num = plist_find_fname (playlist, filename_c)) != -1)
+		plist = playlist;
+	else
+		return guile_c_make_file_tags (NULL);
+
+	if (file_type (filename_c) == F_SOUND)
+		return guile_c_make_file_tags (plist->items[item_num].tags);
+
+	free (filename_c);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+#endif
+
 /* Get the title of a file (malloc()ed) that is present in a menu. */
 static char *get_title (const char *file)
 {
@@ -4376,3 +4415,11 @@ void interface_cmdline_formatted_info (const int server_sock,
 	plist_free (playlist);
 	plist_free (queue);
 }
+
+#ifdef HAVE_GUILE
+
+void guile_init_interface () {
+#include "interface.x"
+}
+
+#endif // HAVE_GUILE

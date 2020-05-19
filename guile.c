@@ -6,7 +6,11 @@
 #include "common.h"
 #include "files.h"
 #include "log.h"
+
+// Sources for snarfed bindings
+#include "interface.h"
 #include "lyrics.h"
+#include "playlist.h"
 
 SCM_DEFINE (guile_run_hook_until_success, "run-hook-until-success", 1, 0, 1,
 	    (SCM hook, SCM args),
@@ -42,6 +46,9 @@ void* guile_init_internal (void* init_file) {
 #include "guile.x"
 #include "lyrics.x"
 
+	guile_init_interface ();
+	guile_init_playlist ();
+
 	if (NULL == init_file || !can_read_file(init_file)) {
 		return NULL;
 	}
@@ -58,4 +65,5 @@ void guile_init (const char* init_file) {
 }
 
 void guile_cleanup () {
+	scm_run_finalizers();
 }

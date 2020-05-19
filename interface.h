@@ -52,6 +52,15 @@ void interface_cmdline_set (int server_sock, char *arg, const int val);
 void interface_cmdline_formatted_info (const int server_sock, const char *format_str);
 void interface_cmdline_enqueue (int server_sock, lists_t_strs *args);
 
+#ifdef HAVE_GUILE
+# include "guile.h"
+
+SCM guile_get_file_tags (SCM filename);
+
+void guile_init_interface ();
+
+#endif
+
 #ifdef __cplusplus
 }
 #endif

@@ -93,6 +93,10 @@ void internal_fatal (const char *file LOGIT_ONLY, int line LOGIT_ONLY,
 	exit (EXIT_FATAL);
 }
 
+int is_server () {
+	return im_server;
+}
+
 void *xmalloc (size_t size)
 {
 	void *p;

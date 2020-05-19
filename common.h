@@ -148,6 +148,7 @@ void internal_error (const char *file, int line, const char *function,
                      const char *format, ...) ATTR_PRINTF(4, 5);
 void internal_fatal (const char *file, int line, const char *function,
                      const char *format, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
+int is_server ();
 void set_me_server ();
 char *str_repl (char *target, const char *oldstr, const char *newstr);
 char *trim (const char *src, size_t len);

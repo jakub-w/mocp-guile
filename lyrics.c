@@ -43,7 +43,7 @@ void* guile_get_lyrics (void* filename) {
 
 	SCM lyrics_filename = guile_run_hook_until_success (
 		guile_get_lyrics_functions,
-		scm_list_1 (scm_from_locale_string ((const char*)filename)));
+		scm_list_1 (scm_from_utf8_string ((const char*)filename)));
 
 	if (scm_is_string (lyrics_filename)) {
 		char* lyrics_filename_c = scm_to_utf8_string (lyrics_filename);

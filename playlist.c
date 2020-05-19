@@ -954,3 +954,312 @@ int plist_get_position (const struct plist *plist, int num)
 
 	return pos;
 }
+
+
+#ifdef HAVE_GUILE
+# include "guile.h"
+
+static SCM guile_file_tags_t;
+
+static void guile_finalize_file_tags (SCM tags) {
+	struct file_tags* tags_p = scm_foreign_object_ref (tags, 0);
+	if (NULL == tags_p) return;
+	tags_free(tags_p);
+}
+
+void guile_init_file_tags_t () {
+	SCM name = scm_from_utf8_symbol ("file-tags");
+	SCM slots = scm_list_1 (scm_from_utf8_symbol ("data"));
+	scm_t_struct_finalize finalizer = guile_finalize_file_tags;
+
+	guile_file_tags_t =
+		scm_make_foreign_object_type (name, slots, finalizer);
+}
+
+
+// tags_free, tags_clear, tags_copy, tags_new, tags_dup
+
+void guile_tags_free (void *tags) {
+	tags_free ((struct file_tags *) tags);
+}
+
+// TODO: Probably make it use keyword arguments instead?
+SCM_DEFINE (guile_make_file_tags, "make-file-tags", 0, 5, 0,
+	    (SCM title, SCM artist, SCM album, SCM track, SCM time),
+	    "Create a new file-tags object. @var{title}, @var{artist} and @var{album}\n"
+	    "are strings, @var{track} and @var{time} are integers.")
+#define FUNC_NAME s_guile_make_file_tags
+{
+	scm_dynwind_begin (0);
+
+	struct file_tags *tags = tags_new ();
+	scm_dynwind_unwind_handler (guile_tags_free, tags, 0);
+
+	if (!scm_is_eq (title, SCM_UNDEFINED)) {
+		SCM_ASSERT_TYPE (scm_is_string (title), title, SCM_ARG1,
+				 FUNC_NAME, "string");
+		tags->title = scm_to_utf8_string (title);
+	}
+	if (!scm_is_eq (artist, SCM_UNDEFINED)) {
+		SCM_ASSERT_TYPE (scm_is_string (artist), artist, SCM_ARG2,
+				 FUNC_NAME, "string");
+		tags->artist = scm_to_utf8_string (artist);
+	}
+	if (!scm_is_eq (album, SCM_UNDEFINED)) {
+		SCM_ASSERT_TYPE (scm_is_string (album), album, SCM_ARG3,
+				 FUNC_NAME, "string");
+		tags->album = scm_to_utf8_string (album);
+	}
+	if (!scm_is_eq (track, SCM_UNDEFINED)) {
+		SCM_ASSERT_TYPE (scm_is_integer (track), track, SCM_ARG4,
+				 FUNC_NAME, "integer number");
+		tags->track = scm_to_int (track);
+	}
+	if (!scm_is_eq (time, SCM_UNDEFINED)) {
+		SCM_ASSERT_TYPE (scm_is_integer (time), time, SCM_ARG5,
+				 FUNC_NAME, "integer number");
+		tags->time = scm_to_int (time);
+		tags->filled |= TAGS_TIME;
+	}
+
+	SCM result = scm_make_foreign_object_1 (guile_file_tags_t, tags);
+
+	scm_dynwind_end ();
+
+	return result;
+}
+#undef FUNC_NAME
+
+SCM guile_c_make_file_tags (const struct file_tags* tags) {
+	if (NULL == tags) {
+		return scm_make_foreign_object_1 (guile_file_tags_t,
+						  tags_new ());
+	}
+	return scm_make_foreign_object_1 (guile_file_tags_t,
+					  tags_dup(tags));
+}
+
+SCM_DEFINE (guile_file_tags_p, "file-tags?", 1, 0, 0,
+	    (SCM obj),
+	    "Return @code{#t} if @var{obj} is file-tags, otherwise return\n"
+	    "@code{#f}.")
+#define FUNC_NAME s_guile_file_tags_p
+{
+	return SCM_IS_A_P (obj, guile_file_tags_t);
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_set_artist_x, "file-tags-set-artist!", 2, 0, 0,
+	    (SCM tags, SCM artist),
+	    "Set artist slot in @var{tags} to @var{artist}.")
+#define FUNC_NAME s_guile_file_tags_set_artist_x
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+	SCM_VALIDATE_STRING(SCM_ARG2, artist);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+
+	free (tags_p->artist);
+	if (!scm_string_null_p (artist))
+		tags_p->artist = scm_to_utf8_string (artist);
+
+	scm_remember_upto_here(tags);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_set_title_x, "file-tags-set-title!", 2, 0, 0,
+	    (SCM tags, SCM title),
+	    "Set title slot in @var{tags} to @var{title}.")
+#define FUNC_NAME s_guile_file_tags_set_title_x
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+	SCM_VALIDATE_STRING(SCM_ARG2, title);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+
+	free (tags_p->title);
+	if (!scm_string_null_p (title))
+		tags_p->title = scm_to_utf8_string (title);
+
+	scm_remember_upto_here(tags);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_set_album_x, "file-tags-set-album!", 2, 0, 0,
+	    (SCM tags, SCM album),
+	    "Set album slot in @var{tags} to @var{album}. Negative @var{time} means\n"
+	    "remove the time value.")
+#define FUNC_NAME s_guile_file_tags_set_album_x
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+	SCM_VALIDATE_STRING(SCM_ARG2, album);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+
+	free (tags_p->album);
+	if (!scm_string_null_p (album))
+		tags_p->album = scm_to_utf8_string (album);
+
+	scm_remember_upto_here(tags);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_set_track_x, "file-tags-set-track!", 2, 0, 0,
+	    (SCM tags, SCM track),
+	    "Set track slot in @var{tags} to @var{track}.")
+#define FUNC_NAME s_guile_file_tags_set_track_x
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+	SCM_ASSERT_TYPE(scm_is_integer(track), track, SCM_ARG2,
+			FUNC_NAME, "integer number");
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+
+	int track_n = scm_to_int (track);
+	if (track_n < 0)
+		tags_p->track = -1;
+	else
+		tags_p->track = track_n;
+
+	scm_remember_upto_here(tags);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_set_time_x, "file-tags-set-time!", 2, 0, 0,
+	    (SCM tags, SCM time),
+	    "Set time slot in @var{tags} to @var{time}. Negative @var{time} means\n"
+	    "remove the time value.")
+#define FUNC_NAME s_guile_file_tags_set_time_x
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+	SCM_ASSERT_TYPE(scm_is_integer(time), time, SCM_ARG2,
+			FUNC_NAME, "integer number");
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+
+	int time_n = scm_to_int (time);
+	if (time_n < 0) {
+		tags_p->time = -1;
+		tags_p->filled &= ~TAGS_TIME;
+	}
+	else {
+		tags_p->time = time_n;
+		tags_p->filled |= TAGS_TIME;
+	}
+
+	scm_remember_upto_here(tags);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_title, "file-tags-title", 1, 0, 0,
+	    (SCM tags),
+	    "Return the title stored in @var{tags} or @code{#f} if there's no title.")
+#define FUNC_NAME s_guile_file_tags_title
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+	if (NULL == tags_p->title)
+		return SCM_BOOL_F;
+
+	SCM result = scm_from_locale_string (tags_p->title);
+
+	scm_remember_upto_here(tags);
+
+	return result;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_artist, "file-tags-artist", 1, 0, 0,
+	    (SCM tags),
+	    "Return the artist stored in @var{tags} or @code{#f} if there's no artist.")
+#define FUNC_NAME s_guile_file_tags_artist
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+	if (NULL == tags_p->artist)
+		return SCM_BOOL_F;
+
+	SCM result = scm_from_locale_string (tags_p->artist);
+
+	scm_remember_upto_here(tags);
+
+	return result;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_album, "file-tags-album", 1, 0, 0,
+	    (SCM tags),
+	    "Return the album stored in @var{tags} or @code{#f} if there's no album.")
+#define FUNC_NAME s_guile_file_tags_album
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+	if (NULL == tags_p->album)
+		return SCM_BOOL_F;
+
+	SCM result = scm_from_locale_string (tags_p->album);
+
+	scm_remember_upto_here(tags);
+
+	return result;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_track, "file-tags-track", 1, 0, 0,
+	    (SCM tags),
+	"Return the track number stored in @var{tags} or @code{#f} if it's not there.")
+#define FUNC_NAME s_guile_file_tags_album
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+	if (-1 == tags_p->track)
+		return SCM_BOOL_F;
+
+	SCM result = scm_from_int (tags_p->track);
+
+	scm_remember_upto_here(tags);
+
+	return result;
+}
+#undef FUNC_NAME
+
+SCM_DEFINE (guile_file_tags_time, "file-tags-time", 1, 0, 0,
+	    (SCM tags),
+	"Return the time number stored in @var{tags} or @code{#f} if it's not there.")
+#define FUNC_NAME s_guile_file_tags_album
+{
+	scm_assert_foreign_object_type (guile_file_tags_t, tags);
+
+	struct file_tags *tags_p = scm_foreign_object_ref (tags, 0);
+	if (-1 == tags_p->time)
+		return SCM_BOOL_F;
+
+	SCM result = scm_from_int (tags_p->time);
+
+	scm_remember_upto_here(tags);
+
+	return result;
+}
+#undef FUNC_NAME
+
+void guile_init_playlist () {
+#include "playlist.x"
+
+	guile_init_file_tags_t();
+}
+
+#endif // HAVE_GUILE

@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
 #include "rbtree.h"
 
 #ifdef __cplusplus
@@ -111,6 +115,29 @@ struct file_tags *plist_get_tags (const struct plist *plist, const int num);
 void plist_swap_files (struct plist *plist, const char *file1,
 		const char *file2);
 int plist_get_position (const struct plist *plist, int num);
+
+#ifdef HAVE_GUILE
+#include "guile.h"
+
+SCM guile_make_file_tags (SCM title, SCM artist, SCM album,
+			  SCM track, SCM time);
+
+// Create a new copy of tags.
+SCM guile_c_make_file_tags (const struct file_tags* tags);
+SCM guile_file_tags_p (SCM obj);
+SCM guile_file_tags_set_artist_x (SCM tags, SCM artist);
+SCM guile_file_tags_set_title_x (SCM tags, SCM title);
+SCM guile_file_tags_set_album_x (SCM tags, SCM album);
+SCM guile_file_tags_set_track_x (SCM tags, SCM track);
+SCM guile_file_tags_set_time_x (SCM tags, SCM time);
+SCM guile_file_tags_get_title (SCM tags);
+SCM guile_file_tags_get_artist (SCM tags);
+SCM guile_file_tags_get_album (SCM tags);
+SCM guile_file_tags_get_track (SCM tags);
+SCM guile_file_tags_get_time (SCM tags);
+
+void guile_init_playlist ();
+#endif
 
 #ifdef __cplusplus
 }
