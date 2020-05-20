@@ -28,6 +28,8 @@
 # include "guile.h"
 #endif
 
+static lists_t_strs *raw_lyrics = NULL;
+static const char *lyrics_message = NULL;
 
 #ifdef HAVE_GUILE
 SCM guile_get_lyrics_functions;
@@ -57,11 +59,11 @@ void* guile_get_lyrics (void* filename) {
 
 	return NULL;
 }
-#endif
 
-
-static lists_t_strs *raw_lyrics = NULL;
-static const char *lyrics_message = NULL;
+void guile_init_lyrics () {
+#include "lyrics.x"
+}
+#endif // HAVE_GUILE
 
 /* Return the list of lyrics lines, or NULL if none are loaded. */
 lists_t_strs *lyrics_lines_get (void)

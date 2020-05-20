@@ -80,7 +80,9 @@ EXTRA_mocp_SOURCES = \
 		     jack.c \
 		     jack.h \
 		     guile.c \
-		     guile.h
+		     guile.h \
+		     guile_protocol.c \
+		     guile_protocol.h
 man_MANS = mocp.1
 mocp_LDADD = @EXTRA_OBJS@ -lltdl -lm
 mocp_DEPENDENCIES = @EXTRA_OBJS@
@@ -97,8 +99,14 @@ doc_DATA = config.example THANKS README README_equalizer keymap.example
 
 
 # TODO: Move this stuff to guile dir?
-GENERATED_BINDINGS = guile.x interface.x lyrics.x playlist.x
-EXTRA_mocp_SOURCES += $(GENERATED_BINDINGS)
+GENERATED_BINDINGS = guile.x \
+		     interface.x \
+		     interface_elements.x \
+		     lyrics.x \
+		     playlist.x
+# TODO: Maybe distribute them? Does guile-snarf always come with guile?
+nodist_EXTRA_mocp_SOURCES = $(GENERATED_BINDINGS)
+
 BUILT_SOURCES = $(GENERATED_BINDINGS)
 CLEANFILES = $(GENERATED_BINDINGS)
 

@@ -9,8 +9,11 @@
 
 // Sources for snarfed bindings
 #include "interface.h"
+#include "interface_elements.h"
 #include "lyrics.h"
 #include "playlist.h"
+
+SCM_GLOBAL_SYMBOL (guile_wrong_context_error, "wrong-context-error");
 
 SCM_DEFINE (guile_run_hook_until_success, "run-hook-until-success", 1, 0, 1,
 	    (SCM hook, SCM args),
@@ -45,11 +48,12 @@ SCM_DEFINE (guile_run_hook_until_success, "run-hook-until-success", 1, 0, 1,
 void* guile_init_internal (void* init_file) {
 #ifndef SCM_MAGIC_SNARFER
 #include "guile.x"
-#include "lyrics.x"
 #endif
 
 	guile_init_interface ();
+	guile_init_interface_elements ();
 	guile_init_playlist ();
+	guile_init_lyrics ();
 
 	if (NULL == init_file || !can_read_file(init_file)) {
 		return NULL;

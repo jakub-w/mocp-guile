@@ -238,13 +238,13 @@ then
 		AC_DEFINE([HAVE_GUILE], 1, [Define if you have GUILE])
 		EXTRA_LIBS="$EXTRA_LIBS $GUILE_3_LIBS"
 		CFLAGS="$CFLAGS $GUILE_3_CFLAGS"
-		EXTRA_OBJS="$EXTRA_OBJS guile.o"
+		EXTRA_OBJS="$EXTRA_OBJS guile.o guile_protocol.o"
 	elif test "$HAVE_GUILE_2" = "yes"
 	then
 		AC_DEFINE([HAVE_GUILE], 1, [Define if you have GUILE])
 		EXTRA_LIBS="$EXTRA_LIBS $GUILE_2_LIBS"
 		CFLAGS="$CFLAGS $GUILE_2_CFLAGS"
-		EXTRA_OBJS="$EXTRA_OBJS guile.o"
+		EXTRA_OBJS="$EXTRA_OBJS guile.o guile_protocol.o"
 	fi
 fi
 

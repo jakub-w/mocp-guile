@@ -50,6 +50,7 @@
 
 #ifdef HAVE_GUILE
 # include "guile.h"
+# include "guile_protocol.h"
 #endif
 
 #define INTERFACE_LOG	"mocp_client_log"
@@ -66,6 +67,13 @@ static struct plist *dir_plist = NULL; /* contents of the current directory */
 
 /* Queue for events coming from the server. */
 static struct event_queue events;
+
+#ifdef HAVE_GUILE
+
+void* guile_dequeue_events (void* arg);
+
+#endif // HAVE_GUILE
+
 
 /* Current working directory (the directory we show). */
 static char cwd[PATH_MAX] = "";
@@ -3608,6 +3616,11 @@ void interface_loop ()
 		FD_SET (STDIN_FILENO, &fds);
 
 		dequeue_events ();
+
+#ifdef HAVE_GUILE
+		scm_with_guile (guile_dequeue_events, NULL);
+#endif // HAVE_GUILE
+
 		ret = pselect (srv_sock + 1, &fds, NULL, NULL, &timeout, NULL);
 		if (ret == -1 && !want_quit && errno != EINTR)
 			interface_fatal ("pselect() failed: %s", xstrerror (errno));
@@ -4382,8 +4395,33 @@ void interface_cmdline_formatted_info (const int server_sock,
 }
 
 #ifdef HAVE_GUILE
-void * guile_make_sure_tags_exits_internal (void* filename) {
-	make_sure_tags_exist ((const char *) filename);
+
+/* Handle events coming from guile */
+void* guile_dequeue_events (void* arg) {
+	SCM event;
+	SCM name;
+	char* name_c;
+
+	debug ("Dequeuing guile events...");
+
+	while (scm_is_true (event = guile_event_pop ())) {
+		assert (scm_thunk_p (event));
+
+		name = scm_procedure_name (event);
+		if (scm_is_symbol (name)) {
+			name = scm_symbol_to_string (name);
+			name_c = scm_to_locale_string (name);
+			logit ("GUILE EVENT: %s", name_c);
+			free (name_c);
+		} else {
+			logit ("GUILE EVENT: Unnamed procedure");
+		}
+
+		scm_call (event, SCM_UNDEFINED);
+	}
+
+	debug ("Done");
+
 	return NULL;
 }
 
@@ -4429,11 +4467,7 @@ SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
 	    "Retrieve tags stored in media file @var{filename}")
 #define FUNC_NAME s_guile_get_file_tags
 {
-	if (is_server ()) {
-		// TODO: Probably throw an error saying its unimplemented for
-		//       the server.
-		return SCM_BOOL_F;
-	}
+	GUILE_ASSERT_CLIENT ();
 
 	scm_dynwind_begin (0);
 
@@ -4448,7 +4482,9 @@ SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
 		plist = dir_plist;
 	else if ((item_num = plist_find_fname (playlist, filename_c)) != -1)
 		plist = playlist;
-	else {		    /* If there are no tags in the playlist */
+	else if (file_type (filename_c) == F_SOUND) {
+		/* If there are no tags in the playlist */
+
 		result = guile_take_file_tags (
 			guile_get_tags_from_srv (filename_c));
 	}
@@ -4463,9 +4499,9 @@ SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
 }
 #undef FUNC_NAME
 
-
 void guile_init_interface () {
 #include "interface.x"
+	guile_event_queue_init();
 }
 
 #endif // HAVE_GUILE

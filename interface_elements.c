@@ -45,6 +45,11 @@
 #include "rcc.h"
 #include "lyrics.h"
 
+#ifdef HAVE_GUILE
+# include "guile.h"
+# include "guile_protocol.h"
+#endif
+
 #ifndef PACKAGE_REVISION
 #define STARTUP_MESSAGE "Welcome to " PACKAGE_NAME \
                         " (version " PACKAGE_VERSION ")!"
@@ -4498,3 +4503,33 @@ void iface_update_queue_position_last (const struct plist *queue,
 	update_queue_position (playlist, dir_list, queue->items[i].file, pos);
 	iface_refresh_screen ();
 }
+
+#ifdef HAVE_GUILE
+SCM guile_interface_refresh_internal () {
+	iface_refresh ();
+
+	return SCM_UNSPECIFIED;
+}
+SCM guile_interface_refresh_internal_proc;
+SCM_SNARF_INIT({guile_interface_refresh_internal_proc =
+			scm_c_make_gsubr ("interface-refresh-internal",
+					  0, 0, 0,
+					  guile_interface_refresh_internal);})
+
+SCM_DEFINE (guile_interface_refresh, "interface-refresh", 0, 0, 0, (),
+	    "Refresh the client's ncurses interface.")
+#define FUNC_NAME s_guile_interface_refresh
+{
+	GUILE_ASSERT_CLIENT ();
+
+	guile_event_push (guile_interface_refresh_internal_proc);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+void guile_init_interface_elements () {
+#include "interface_elements.x"
+}
+
+#endif // HAVE_GUILE

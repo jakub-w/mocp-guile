@@ -150,6 +150,10 @@ void iface_update_queue_position_last (const struct plist *queue,
 void iface_update_attrs ();
 void iface_update_theme_selection (const char *file);
 
+#ifdef HAVE_GUILE
+void guile_init_interface_elements ();
+#endif // HAVE_GUILE
+
 #ifdef __cplusplus
 }
 #endif
