@@ -23,7 +23,7 @@ struct {
 
 void guile_event_queue_init ();
 
-void guile_event_push (SCM thunk);
+void guile_event_push (SCM proc, SCM args);
 SCM guile_event_pop ();
 
 #endif // HAVE_GUILE

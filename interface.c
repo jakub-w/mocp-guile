@@ -787,7 +787,7 @@ static void update_curr_file ()
 		file_info_cleanup (&curr_file);
 		file_info_reset (&curr_file);
 		iface_set_played_file (NULL);
-		iface_load_lyrics (NULL);
+		iface_autoload_lyrics (NULL);
 		free (file);
 	}
 	else if (file[0] &&
@@ -828,7 +828,7 @@ static void update_curr_file ()
 		iface_set_played_file (file);
 		iface_set_played_file_title (curr_file.title);
 		/* Try to load the lyrics of the new file. */
-		iface_load_lyrics (file);
+		iface_autoload_lyrics (file);
 		/* Silent seeking makes no sense if the playing file has changed. */
 		silent_seek_pos = -1;
 		iface_set_curr_time (curr_file.curr_time);
@@ -4407,17 +4407,21 @@ void* guile_dequeue_events (void* arg) {
 	while (scm_is_true (event = guile_event_pop ())) {
 		assert (scm_thunk_p (event));
 
-		name = scm_procedure_name (event);
+		SCM proc = (scm_car (event));
+		SCM args = (scm_cdr (event));
+
+		name = scm_procedure_name (proc);
 		if (scm_is_symbol (name)) {
 			name = scm_symbol_to_string (name);
 			name_c = scm_to_locale_string (name);
 			logit ("GUILE EVENT: %s", name_c);
 			free (name_c);
-		} else {
+		}
+		else {
 			logit ("GUILE EVENT: Unnamed procedure");
 		}
 
-		scm_call (event, SCM_UNDEFINED);
+		scm_apply_0 (proc, args);
 	}
 
 	debug ("Done");
@@ -4498,6 +4502,79 @@ SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
 	return result;
 }
 #undef FUNC_NAME
+
+SCM guile_interface_refresh_internal () {
+	iface_refresh ();
+
+	return SCM_UNSPECIFIED;
+}
+SCM guile_interface_refresh_internal_proc;
+SCM_SNARF_INIT({guile_interface_refresh_internal_proc =
+			scm_c_make_gsubr ("interface-refresh-internal",
+					  0, 0, 0,
+					  guile_interface_refresh_internal);})
+
+SCM_DEFINE (guile_interface_refresh, "interface-refresh", 0, 0, 0, (),
+	    "Refresh the client's ncurses interface.")
+#define FUNC_NAME s_guile_interface_refresh
+{
+	GUILE_ASSERT_CLIENT ();
+
+	guile_event_push (guile_interface_refresh_internal_proc, SCM_EOL);
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
+/* Set the lyrics only if the currently playing file is filename. */
+SCM guile_lyrics_load_internal (SCM filename, SCM lyrics_filename) {
+	if (!curr_file.file) return SCM_UNSPECIFIED;
+
+	scm_dynwind_begin (0);
+
+	char* lyrics_file = scm_to_locale_string (lyrics_filename);
+	scm_dynwind_free (lyrics_file);
+
+	char* file = scm_to_utf8_string (filename);
+	char* abs_file = realpath (file, NULL);
+	free (file);
+	scm_dynwind_free (abs_file);
+
+	char* abs_curr_file = realpath (curr_file.file, NULL);
+	scm_dynwind_free (abs_curr_file);
+
+	if (!strcmp (abs_curr_file, abs_file)) {
+		iface_load_lyrics (lyrics_file);
+	}
+
+	scm_dynwind_end ();
+
+	return SCM_UNSPECIFIED;
+}
+SCM guile_lyrics_load_internal_proc;
+SCM_SNARF_INIT({guile_lyrics_load_internal_proc =
+			scm_c_make_gsubr ("lyrics-set-internal",
+					  2, 0, 0,
+					  guile_lyrics_load_internal);})
+
+SCM_DEFINE (guile_lyrics_load, "lyrics-load", 2, 0, 0,
+	    (SCM file, SCM lyrics_file),
+	    "Load the lyrics from @var{lyrics_file} if @var{file} is the currently playing file.")
+#define FUNC_NAME s_guile_lyrics_load
+{
+	GUILE_ASSERT_CLIENT ();
+
+	SCM_VALIDATE_STRING (SCM_ARG1, file);
+	SCM_VALIDATE_STRING (SCM_ARG1, lyrics_file);
+	scm_stat(lyrics_file, SCM_BOOL_T);
+
+        guile_event_push (guile_lyrics_load_internal_proc,
+			  scm_list_2 (file, lyrics_file));
+
+	return SCM_UNSPECIFIED;
+}
+#undef FUNC_NAME
+
 
 void guile_init_interface () {
 #include "interface.x"

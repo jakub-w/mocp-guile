@@ -4413,7 +4413,15 @@ void iface_restore ()
 		curs_set (0);
 }
 
-void iface_load_lyrics (const char *file)
+void iface_load_lyrics (const char *lyrics_file)
+{
+	lyrics_cleanup ();
+	lyrics_load (lyrics_file);
+	main_win.lyrics_screen_top = 0;
+	main_win_draw (&main_win);
+}
+
+void iface_autoload_lyrics (const char *file)
 {
 	lyrics_cleanup ();
 	lyrics_autoload (file);
@@ -4505,28 +4513,6 @@ void iface_update_queue_position_last (const struct plist *queue,
 }
 
 #ifdef HAVE_GUILE
-SCM guile_interface_refresh_internal () {
-	iface_refresh ();
-
-	return SCM_UNSPECIFIED;
-}
-SCM guile_interface_refresh_internal_proc;
-SCM_SNARF_INIT({guile_interface_refresh_internal_proc =
-			scm_c_make_gsubr ("interface-refresh-internal",
-					  0, 0, 0,
-					  guile_interface_refresh_internal);})
-
-SCM_DEFINE (guile_interface_refresh, "interface-refresh", 0, 0, 0, (),
-	    "Refresh the client's ncurses interface.")
-#define FUNC_NAME s_guile_interface_refresh
-{
-	GUILE_ASSERT_CLIENT ();
-
-	guile_event_push (guile_interface_refresh_internal_proc);
-
-	return SCM_UNSPECIFIED;
-}
-#undef FUNC_NAME
 
 void guile_init_interface_elements () {
 #include "interface_elements.x"

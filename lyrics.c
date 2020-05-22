@@ -118,6 +118,16 @@ lists_t_strs *lyrics_load_file (const char *filename)
 	return result;
 }
 
+/* Load lyrics from the given lyrics file, unconditionally. */
+void lyrics_load (const char *lyrics_filename)
+{
+	assert (lyrics_filename);
+	assert (!raw_lyrics);
+	assert (lyrics_message);
+
+	raw_lyrics = lyrics_load_file (lyrics_filename);
+}
+
 /* Given an audio's file name, load lyrics from the default lyrics file name. */
 void lyrics_autoload (const char *filename)
 {
@@ -140,7 +150,7 @@ void lyrics_autoload (const char *filename)
 	lyrics_filename = scm_with_guile (&guile_get_lyrics, (void*)filename);
 
 	if (lyrics_filename != NULL) {
-		raw_lyrics = lyrics_load_file (lyrics_filename);
+		lyrics_load (lyrics_filename);
 		free (lyrics_filename);
 		return;
 	}
@@ -155,7 +165,7 @@ void lyrics_autoload (const char *filename)
 	extn = ext_pos (lyrics_filename);
 	if (extn) {
 		*--extn = '\0';
-		raw_lyrics = lyrics_load_file (lyrics_filename);
+		lyrics_load (lyrics_filename);
 	}
 	else
 		lyrics_message = "[No lyrics file!]";
