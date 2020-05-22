@@ -3602,6 +3602,15 @@ void init_interface (const int sock, const int logging, lists_t_strs *args)
 		iface_switch_to_plist ();
 }
 
+static int interface_max_fd (int max) {
+#ifdef HAVE_GUILE
+		if (guile_events.wake_up_pipe[0] > max)
+			max = guile_events.wake_up_pipe[0];
+#endif // HAVE_GUILE
+
+	return max;
+}
+
 void interface_loop ()
 {
 	log_circular_start ();
@@ -3614,6 +3623,9 @@ void interface_loop ()
 		FD_ZERO (&fds);
 		FD_SET (srv_sock, &fds);
 		FD_SET (STDIN_FILENO, &fds);
+#ifdef HAVE_GUILE
+		FD_SET (guile_events.wake_up_pipe[0], &fds);
+#endif // HAVE_GUILE
 
 		dequeue_events ();
 
@@ -3621,9 +3633,26 @@ void interface_loop ()
 		scm_with_guile (guile_dequeue_events, NULL);
 #endif // HAVE_GUILE
 
-		ret = pselect (srv_sock + 1, &fds, NULL, NULL, &timeout, NULL);
+		ret = pselect (interface_max_fd (srv_sock) + 1,
+			       &fds, NULL, NULL, &timeout, NULL);
 		if (ret == -1 && !want_quit && errno != EINTR)
 			interface_fatal ("pselect() failed: %s", xstrerror (errno));
+
+#ifdef HAVE_GUILE
+		else if (FD_ISSET (guile_events.wake_up_pipe[0], &fds)) {
+			logit ("Got Guile 'wake up'");
+
+			int ok = 1;
+
+			scm_with_guile (guile_consume_wake_up, &ok);
+
+			if (!ok) {
+				interface_fatal (
+					"Can't read wake up signal: %s",
+					xstrerror (errno));
+			}
+		}
+#endif // HAVE_GUILE
 
 		iface_tick ();
 
@@ -4397,14 +4426,17 @@ void interface_cmdline_formatted_info (const int server_sock,
 #ifdef HAVE_GUILE
 
 /* Handle events coming from guile */
-void* guile_dequeue_events (void* arg) {
+void* guile_dequeue_events (void* arg ATTR_UNUSED) {
 	SCM event;
 	SCM name;
 	char* name_c;
 
+	scm_dynwind_begin (0);
+	scm_dynwind_lock_mutex (guile_events.mutex);
+
 	debug ("Dequeuing guile events...");
 
-	while (scm_is_true (event = guile_event_pop ())) {
+	while (scm_is_true (event = guile_event_pop_unsafe ())) {
 		assert (scm_thunk_p (event));
 
 		SCM proc = (scm_car (event));
@@ -4423,6 +4455,8 @@ void* guile_dequeue_events (void* arg) {
 
 		scm_apply_0 (proc, args);
 	}
+
+	scm_dynwind_end ();
 
 	debug ("Done");
 
@@ -4466,9 +4500,15 @@ struct file_tags * guile_get_tags_from_srv (const char* file) {
 // TODO: Test if it works when the requested file isn't on the playlist.
 //       It will ask the server to send them but I don't know if it will
 //       really work.
+// FIXME: Synchronize it better with interface_loop().
+//        Remember: it can be called asynchronously, but
+//        guile_get_tags_from_srv() isn't really async-safe. Also all of the
+//        playlist functions aren't.
+//        Also update the docstring after it's fixed.
 SCM_DEFINE (guile_get_file_tags, "get-file-tags", 1, 0, 0,
 	    (SCM filename),
-	    "Retrieve tags stored in media file @var{filename}")
+	    "Retrieve tags stored in media file @var{filename}.\n\n"
+	    "Warning: Unsafe to use outside of @code{get-lyrics-functions}!")
 #define FUNC_NAME s_guile_get_file_tags
 {
 	GUILE_ASSERT_CLIENT ();
